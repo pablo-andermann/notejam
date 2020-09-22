@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  php:
+    container_name: notejam-php
+    build:
+      context: .
+      dockerfile: _dockerize/notejam_sf/Dockerfile
+    volumes:
+      - ./app:/app/app:cached
+      - ./src:/app/src:cached
+      - ./web:/app/web:cached
+    ports:
+      - 9000:9000
+
+  nginx:
+      container_name: notejam-nginx
+      image: nginx:1.19
+      ports:
+        - "8080:80"
+      links:
+        - php
+      volumes_from:
+        - php
+      volumes:
+        - ./_dockerize/var/logs/nginx/:/var/log/nginx
+        - ./_dockerize/nginx/config/nginx.conf:/etc/nginx/nginx.conf
+        - ./_dockerize/nginx/config/symfony.conf:/etc/nginx/conf.d/default.conf
+
+volumes:
+  db-data-volume:
