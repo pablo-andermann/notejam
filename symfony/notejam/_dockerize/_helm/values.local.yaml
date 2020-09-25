@@ -1,0 +1,17 @@
+# This file is intended to provide non-secret env values when deploying this chart to a local kubernetes cluster.
+#  helm install --name <name-of-deployment> . -f values.local.yaml -f values.local.secrets.yaml
+
+app:
+  symfonyAppPath: .
+  symfonyEnv: dev
+image:
+  repository: notejam_php
+  tag: latest
+  pullPolicy: Never
+mysql:
+  enabled: false
+  mysqlUser: jnjtest
+  mysqlDatabase: symfony
+  mysqlPort: 3306
+  persistence:
+    size: 1Gi

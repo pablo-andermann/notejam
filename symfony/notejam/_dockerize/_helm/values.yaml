@@ -1,0 +1,67 @@
+# Default values.
+
+replicaCount: 1
+nginx:
+  image:
+    repository: nginx
+    tag: 1.19
+    pullPolicy: IfNotPresent
+  prometheusExporter:
+    enabled: false
+    image:
+      repository: nginx/nginx-prometheus-exporter
+      tag: 0.4.2
+      pullPolicy: IfNotPresent
+fpm:
+  prometheusExporter:
+    enabled: false
+    image:
+      repository: hipages/php-fpm_exporter
+      tag: 1.0.0
+      pullPolicy: IfNotPresent
+image:
+  repository: local/notejam_php
+  tag: latest
+  pullPolicy: Always
+service:
+  port: 80
+ingress:
+  enabled: false
+resources: null
+nodeSelector: {}
+tolerations: []
+affinity: {}
+mysql:
+  enabled: false
+  imageTag: 5.7.14
+db: null
+prometheusRules:
+  enabled: false
+#   namespace: monitoring
+#   prometheusInstance: k8s
+#   downTimeDuration: 1m
+#   rateUpperLimit: 100.0
+#   errorLimit: 0.01
+#   responseTimeLimit: 2.000
+#   responseTimeDuration: 1m
+serviceMonitor:
+  enabled: false
+#   interval: 15s
+#   scrapeTimeout: 5s
+#   namespace: monitoring
+app:
+  logDestination: stdout
+  newRelicEnabled: false
+  symfonyAppPath: .
+  symfonyDebug: 0
+  phpMemoryMBs: 128
+  fpmWorkers: 8
+  symfonyEnv: prod
+  debugMessages: false
+  verboseLogging: false
+
+  updatesJob:
+    enabled: false
+  secret:
+    enabled: false
+

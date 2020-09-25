@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "notejam-sf.fullname" . }}
+  labels:
+    {{- include "notejam-sf.labels" . }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    # - port: 9253
+    #   targetPort: prom-fpm
+    #   protocol: TCP
+    #   name: prom-fpm
+    # - port: 9113
+    #   targetPort: prom-nginx
+    #   protocol: TCP
+    #   name: prom-nginx            
+  selector:
+    app.kubernetes.io/name: {{ include "notejam-sf.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}

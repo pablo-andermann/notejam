@@ -1,0 +1,35 @@
+{{- if .Values.prometheusRules.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "notejam-sf.fullname" . }}
+  namespace: {{ .Values.prometheusRules.namespace }}
+  labels:
+    {{- include "notejam-sf.labels" . }}
+    prometheus: {{ .Values.prometheusRules.prometheusInstance }}
+    role: prometheus-rulefiles
+spec:
+  groups:
+    - name: {{ include "notejam-sf.fullname" . }}
+      rules:
+        - alert: PodDownFpm
+          expr: up{job="{{ include "notejam-sf.fullname" . }}",endpoint="prom-fpm"} == 0
+          for: {{ .Values.prometheusRules.downTimeDuration }}
+          annotations:
+            summary: The fpm pool for pod [{{`{{$labels.pod}}`}}] for [{{ include "notejam-sf.fullname" . }}] is down
+        - alert: PodDownNginx
+          expr: up{job="{{ include "notejam-sf.fullname" . }}",endpoint="prom-nginx"} == 0
+          for: {{ .Values.prometheusRules.downTimeDuration }}
+          annotations:
+            summary: The nginx instance for pod [{{`{{$labels.pod}}`}}] for [{{ include "notejam-sf.fullname" . }}] are down
+        - alert: NoNginx
+          expr: absent(up{job="{{ include "notejam-sf.fullname" . }}",endpoint="prom-nginx"})
+          for: {{ .Values.prometheusRules.downTimeDuration }}
+          annotations:
+            summary: No nginx instances for [{{ include "notejam-sf.fullname" . }}] are available
+        - alert: NoFpm
+          expr: absent(up{job="{{ include "notejam-sf.fullname" . }}",endpoint="prom-fpm"})
+          for: {{ .Values.prometheusRules.downTimeDuration }}
+          annotations:
+            summary: No fpm pools for [{{ include "notejam-sf.fullname" . }}] are available  
+{{- end }}

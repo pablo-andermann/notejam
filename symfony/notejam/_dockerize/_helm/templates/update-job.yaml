@@ -1,0 +1,50 @@
+{{- if .Values.app.updatesJob.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "notejam-sf.fullname" . }}-db-migration
+  labels:
+    {{- include "notejam-sf.labels" . }}
+  annotations:
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 14400
+  backoffLimit: 8
+  template:
+    metadata:
+      name: "{{.Release.Name}}"
+      labels:
+        helm.sh/chart: {{ include "notejam-sf.chart" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: update-job
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        command: ["/bin/sh","-c"]
+        args: 
+          - php /app/bin/console doctrine:schema:update --force;
+            php /app/bin/console doctrine:migrations:migrate -n;
+        {{- if .Values.db }}
+        {{- else }}
+        env:
+          - name: DATABASE_PASSWORD
+            valueFrom: 
+              secretKeyRef: 
+                name: {{ include "notejam-sf.mysql.fullname" . }}
+                key: mysql-password
+        {{- end }}
+
+        envFrom:
+          - configMapRef:
+              name: {{ include "notejam-sf.fullname" . }}
+          {{- if .Values.app.secret.enabled }}
+          - secretRef:
+              name: {{ include "notejam-sf.fullname" . }}
+          {{- end }}
+{{- end }}

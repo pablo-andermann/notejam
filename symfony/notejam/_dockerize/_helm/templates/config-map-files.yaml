@@ -1,0 +1,69 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ include "notejam-sf.fullname" . }}-files
+  labels:
+    {{- include "notejam-sf.labels" . }}  
+data:
+  nginx.conf: |
+    server {
+      listen 80 default_server;
+      listen [::]:80 default_server;
+
+      client_max_body_size 16M;
+      
+      # Set nginx to serve files from the shared volume:
+      root /var/www/symfony/web;
+      server_name _;
+
+      include /etc/nginx/mime.types;
+
+      location / {
+          # try to serve file directly, fallback to app.php
+          try_files $uri /app.php$is_args$args;
+      }
+
+      location ~ ^/(app|app_dev)\.php(/|$) {
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_split_path_info ^(.+\.php)(/.*)$;
+        include fastcgi_params;
+
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        fastcgi_param DOCUMENT_ROOT $realpath_root;
+
+        # Prevents URIs that include the front controller. This will 404:
+        # http://domain.tld/app.php/some-path
+        # Remove the internal directive to allow URIs like this
+        internal;
+      }
+
+      # return 404 for all other php files not matching the front controller
+      # this prevents access to other php files you don't want to be accessible.
+      location ~ \.php$ {
+          return 404;
+      }
+    }
+    
+    server {
+      listen 8080 default_server;
+      listen [::]:8080 default_server;
+      server_name _;
+
+      location /nginx_status {
+        stub_status on;
+        access_log  on;           
+        allow all;  # REPLACE with your access policy
+      }
+    }
+    
+  fpm.www.conf: |
+    [www]
+    pm.status_path = /status
+    php_admin_value[memory_limit] = {{ .Values.app.phpMemoryMBs }}M
+    php_admin_value[session.auto_start] = false
+    
+    pm = static
+    pm.max_children = {{ .Values.app.fpmWorkers }}
+    pm.max_requests = 500
+
+    

@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "notejam-sf.fullname" . }}
+  labels:
+    {{- include "notejam-sf.labels" . }}
+data:
+  LOG_DESTINATION: {{ .Values.app.logDestination }}
+  SYMFONY_APP_PATH: {{ .Values.app.symfonyAppPath }}
+  SYMFONY_ENV: {{ .Values.app.symfonyEnv }}
+
+  {{- if .Values.db }}
+  DATABASE_HOST: {{ .Values.db.host }}
+  DATABASE_USER: {{ .Values.db.username }}
+  DATABASE_NAME: {{ .Values.db.database }}
+  DATABASE_PORT: {{ .Values.db.port | quote }}
+  {{- else }}
+  DATABASE_HOST: {{ include "notejam-sf.mysql.fullname" . }}
+  DATABASE_USER: {{ .Values.mysql.mysqlUser }}
+  DATABASE_NAME: {{ .Values.mysql.mysqlDatabase }}
+  DATABASE_PORT: {{ .Values.mysql.mysqlPort | quote }}
+  {{- end }}
+
+  {{- if .Values.app.newRelicEnabled }}
+  NEW_RELIC_APP_NAME: {{ .Values.newrelic.appName }}
+  NEW_RELIC_LOG_LEVEL: {{ .Values.newrelic.logLevel }}
+  {{- end }}  
+
+  SYMFONY_DEBUG: {{ .Values.app.symfonyDebug | quote }}
+  DATABASE_DRIVER: pdo_mysql
+
+  PDO_DB_OPTIONS: "{ db_table: session, db_id_col: session_id, db_data_col: session_value, db_time_col: session_time, db_lifetime_col: session_lifetime, lock_mode: 0}"
+  PDO_CONNECTION_DN: mysql:host=%database_host%;port=%database_port%;dbname=%database_name%;user=%database_user%;password=%database_password%
+
+  DEBUG_MESSAGES: {{ .Values.app.debugMessages | quote }}
+  VERBOSE_LOGGING: {{ .Values.app.verboseLogging | quote }}

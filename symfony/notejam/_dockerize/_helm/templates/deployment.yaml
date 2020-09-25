@@ -1,0 +1,189 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "notejam-sf.fullname" . }}
+  labels:
+    {{- include "notejam-sf.labels" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "notejam-sf.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "notejam-sf.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      initContainers:
+        - name: {{ .Chart.Name }}-init
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+          # mount the shared volume at /var/ww/symfony (/var/ww/symfony has also been configured in config-map.nginx.yaml as the root document directory for NGINX) allowing the app container and the NGINX sidecar to both access shared-files:
+            - name: shared-files
+              mountPath: /var/www/symfony
+          command: ["/bin/sh", "-c", "cp -R /app/* /var/www/symfony"]
+      containers:
+        # the application/php-fpm container:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            # mount the shared volume at /var/ww/symfony 
+            # (/var/ww/symfony has also been configured in config-map.nginx.yaml
+            - name: shared-files
+              mountPath: /var/www/symfony
+            - name: files-config-volume
+              mountPath: /usr/local/etc/php-fpm.d/www.extra.conf
+              subPath: fpm.www.conf       
+            - name: files-config-volume
+              mountPath: /usr/local/etc/php/conf.d/extras.ini
+              subPath: extras.ini
+          ports:
+            - name: fpm
+              containerPort: 9000
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: fpm
+          readinessProbe:
+            tcpSocket:
+              port: fpm
+          resources:
+            limits:
+              memory: {{ mul (add .Values.app.fpmWorkers 4) .Values.app.phpMemoryMBs }}Mi
+              cpu: {{ mul .Values.app.fpmWorkers 200 }}m
+            requests:
+              memory: {{ mul (add .Values.app.fpmWorkers 1) .Values.app.phpMemoryMBs }}Mi
+              cpu: {{ mul .Values.app.fpmWorkers 100 }}m
+          {{- if .Values.db -}}
+          {{- else }}
+          env:
+            - name: DATABASE_PASSWORD
+              {{- if .Values.app.secret.enabled }}
+              valueFrom: 
+                secretKeyRef: 
+                  name: {{ include "notejam-sf.mysql.fullname" . }}
+                  key: mysql-password
+              {{- end }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "notejam-sf.fullname" . }}
+            {{- if .Values.app.secret.enabled }}
+            - secretRef:
+                name: {{ include "notejam-sf.fullname" . }}
+            {{- end }}
+        - name: nginx
+          image: "{{ .Values.nginx.image.repository }}:{{ .Values.nginx.image.tag }}"
+          imagePullPolicy: {{ .Values.nginx.image.pullPolicy }}
+          volumeMounts:
+            - name: shared-files
+              mountPath: /var/www/symfony
+            - name: files-config-volume
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: nginx.conf     
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            timeoutSeconds: 10
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            httpGet:
+              path: /
+              port: 80
+          # readinessProbe:
+          #   timeoutSeconds: 10
+          #   httpGet:
+          #     path: /
+          #     port: 80     
+          resources:
+            limits:
+              memory: 256Mi
+              cpu: 0.2
+            requests:
+              memory: 128Mi
+              cpu: 0.1
+          envFrom:
+            - configMapRef:
+                name: {{ include "notejam-sf.fullname" . }}         
+            {{- if .Values.app.secret.enabled }}
+            - secretRef:
+                name: {{ include "notejam-sf.fullname" . }}  
+            {{- end }}
+
+        {{- if .Values.nginx.prometheusExporter.enabled }}
+        - name: nginx-exporter
+          image: "{{ .Values.nginx.prometheusExporter.image.repository }}:{{ .Values.nginx.prometheusExporter.image.tag }}"
+          imagePullPolicy: {{ .Values.nginx.prometheusExporter.image.pullPolicy }}
+          args:
+            - "--nginx.scrape-uri"
+            - "http://localhost:8080/nginx_status"
+          livenessProbe:
+            tcpSocket:
+              port: prom-nginx
+          readinessProbe:
+            tcpSocket:
+              port: prom-nginx               
+          ports:
+            - name: prom-nginx
+              containerPort: 9113
+              protocol: TCP
+          resources:
+            limits:
+              memory: 32Mi
+              cpu: 0.2
+            requests:
+              memory: 16Mi
+              cpu: 0.05                
+        {{- end }} 
+
+        {{- if .Values.fpm.prometheusExporter.enabled }}              
+        - name: fpm-exporter
+          image: "{{ .Values.fpm.prometheusExporter.image.repository }}:{{ .Values.fpm.prometheusExporter.image.tag }}"
+          imagePullPolicy: {{ .Values.fpm.prometheusExporter.image.pullPolicy }}
+          env:
+            - name: PHP_FPM_SCRAPE_URI
+              value: tcp://127.0.0.1:9000/status
+          livenessProbe:
+            tcpSocket:
+              port: prom-fpm
+          readinessProbe:
+            tcpSocket:
+              port: prom-fpm               
+          ports:
+            - name: prom-fpm
+              containerPort: 9253
+              protocol: TCP     
+          resources:
+            limits:
+              memory: 32Mi
+              cpu: 0.2
+            requests:
+              memory: 16Mi
+              cpu: 0.05                          
+        {{- end }} 
+      # create the shared volumes to be used by both the app container and the NGINX sidecar:        
+      volumes:
+      - name: shared-files
+        emptyDir: {}
+      # Add the ConfigMap (config-map-files.yaml) as a volume for the pod
+      - name: files-config-volume
+        configMap:
+          name: {{ include "notejam-sf.fullname" . }}-files
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

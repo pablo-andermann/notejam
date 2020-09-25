@@ -1,0 +1,9 @@
+apiVersion: v1
+appVersion: 2.0
+description: A Helm chart for Kubernetes
+name: notejam-sf
+version: 2.0
+maintainers:
+  - name: Pablo Andermann
+    email: iopa.ey@gmail.com
+home: https://github.com/pablo-andermann/notejam
