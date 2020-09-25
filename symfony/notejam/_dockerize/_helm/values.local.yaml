@@ -4,10 +4,10 @@
 app:
   symfonyAppPath: .
   symfonyEnv: dev
-image:
-  repository: notejam_php
-  tag: latest
-  pullPolicy: Never
+# image:
+#   repository: notejam_php
+#   tag: latest
+#   pullPolicy: Never
 mysql:
   enabled: false
   mysqlUser: jnjtest

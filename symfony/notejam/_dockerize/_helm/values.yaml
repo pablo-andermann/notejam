@@ -20,7 +20,7 @@ fpm:
       tag: 1.0.0
       pullPolicy: IfNotPresent
 image:
-  repository: local/notejam_php
+  repository: yiopa/notejam-test
   tag: latest
   pullPolicy: Always
 service:
